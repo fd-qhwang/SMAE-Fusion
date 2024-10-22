@@ -1,0 +1,80 @@
+# General settings
+name: ########
+model_type: SMAEFtModel
+num_gpu: 1  # set num_gpu: 0 for CPU mode
+manual_seed: 42
+
+# Dataset and data loader settings
+datasets:
+  train:
+    name: MSRS
+    type: SMAETrainDataset
+    is_train: True
+    stride: 128
+    is_RGB: False
+    dataroot_source1: ~
+    dataroot_source2: ~
+    mask_path: ~
+    ir_map_path: ~
+    vis_map_path: ~
+
+    img_size: 128
+
+    num_worker_per_gpu: 12
+    batch_size_per_gpu: 4
+    dataset_enlarge_ratio: 1
+    pin_memory: true
+    prefetch_mode: cuda
+
+
+# Network structures
+network_g:
+  type: SMAEFinetune
+  inp_channels: 1
+  dim: 64
+  img_size: 128
+  encoder_configs: {
+      'num_blocks': 4,
+      'dim': 64,
+      'num_heads': 8,
+      'ffn_expansion_factor': 4,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+  decoder_configs: {
+      'num_blocks': 2,
+      'dim': 64,
+      'num_heads': 4,
+      'ffn_expansion_factor': 2,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+
+# Training settings
+train:
+  ema_decay: 0  # EMA not used
+  clip_grad: False
+  freeze_encoder: False
+  # Optimizers
+  optim_g:
+    type: AdamW
+    lr: !!float 2e-4
+    weight_decay: !!float 1e-2
+    betas: [0.9, 0.99]
+
+  # Scheduler: Cosine Annealing with Restarts
+  scheduler:
+    type: CosineAnnealingRestartLR
+    periods: [250000, 250000]
+    restart_weights: [1, 1]
+    eta_min: !!float 2e-6
+
+  total_iter: 500000
+  warmup_iter: 10000  # Warmup iterations
+  # Loss function for pretraining
+
+###The remaining code is in progress and will be uploaded shortly###
