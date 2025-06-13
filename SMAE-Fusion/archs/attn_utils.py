@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------
+# Copyright (c) 2021, NVIDIA Corporation. All rights reserved.
+#
+# This work is licensed under the NVIDIA Source Code License
+# ---------------------------------------------------------------
 import numpy as np
 from torch import tensor
 import torch.nn as nn
@@ -144,7 +149,28 @@ class DualModalFusionSelfAttention(nn.Module):
     def __init__(self, dim, num_heads=8, ffn_expansion_factor=2.66, bias=False, LayerNorm_type="WithBias"):
         super(DualModalFusionSelfAttention, self).__init__()
 
-        ###The remaining code is in progress and will be uploaded shortly###
+        # Self-Attention and FeedForward for modality 1 (e.g., infrared)
+        self.norm1_mod1 = LayerNorm(dim, LayerNorm_type)
+        self.attn_mod1 = Attention(dim, num_heads, bias)
+        self.norm2_mod1 = LayerNorm(dim, LayerNorm_type)
+        self.ffn_mod1 = FeedForward(dim, ffn_expansion_factor, bias)
+
+        # Self-Attention and FeedForward for modality 2 (e.g., visible)
+        self.norm1_mod2 = LayerNorm(dim, LayerNorm_type)
+        self.attn_mod2 = Attention(dim, num_heads, bias)
+        self.norm2_mod2 = LayerNorm(dim, LayerNorm_type)
+        self.ffn_mod2 = FeedForward(dim, ffn_expansion_factor, bias)
+
+    def forward(self, x1, x2):
+        # Process modality 1 (e.g., infrared)
+        x1 = x1 + self.attn_mod1(self.norm1_mod1(x1))
+        x1 = x1 + self.ffn_mod1(self.norm2_mod1(x1))
+
+        # Process modality 2 (e.g., visible)
+        x2 = x2 + self.attn_mod2(self.norm1_mod2(x2))
+        x2 = x2 + self.ffn_mod2(self.norm2_mod2(x2))
+
+        return x1, x2
 
 class CrossAttention(nn.Module):
     def __init__(self, dim, num_heads, bias=False, LayerNorm_type="WithBias"):
@@ -198,15 +224,47 @@ class ProgressiveFusionCrossAttention(nn.Module):
     def __init__(self, dim=36, num_heads=6, ffn_expansion_factor=2.66, bias=False, LayerNorm_type="WithBias"):
         super(ProgressiveFusionCrossAttention, self).__init__()
 
-        ###The remaining code is in progress and will be uploaded shortly###
+        # Cross-attention mechanism for modality 1 and modality 2
+        self.cross_attention_mod1 = CrossAttention(dim, num_heads, bias, LayerNorm_type)
+        self.cross_attention_mod2 = CrossAttention(dim, num_heads, bias, LayerNorm_type)
+
+        # LayerNorm and FeedForward for modality 1
+        self.norm2_mod1 = LayerNorm(dim, LayerNorm_type)
+        self.ffn_mod1 = FeedForward(dim, ffn_expansion_factor, bias)
+
+        # LayerNorm and FeedForward for modality 2
+        self.norm2_mod2 = LayerNorm(dim, LayerNorm_type)
+        self.ffn_mod2 = FeedForward(dim, ffn_expansion_factor, bias)
+
+        # Output projection layer
+        self.project_out = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
+
+    def forward(self, d1, d2, s1, s2):
+        # Process deep features and shallow features for modality 1
+        ds1 = torch.cat([d1, s1], dim=1)
+        ds2 = torch.cat([d2, s2], dim=1)
+
+        # Apply cross-attention and projection for modality 1
+        d1 = d1 + self.project_out(self.cross_attention_mod1(d1, ds2))
+        d1 = d1 + self.ffn_mod1(self.norm2_mod1(d1))
+
+        # Apply cross-attention and projection for modality 2
+        d2 = d2 + self.project_out(self.cross_attention_mod2(d2, ds1))
+        d2 = d2 + self.ffn_mod2(self.norm2_mod2(d2))
+
+        return d1, d2
     
 class ConcatFusion(nn.Module):
     def __init__(self, feature_dim):
         super(ConcatFusion, self).__init__()
         self.dim_reduce = nn.Sequential(
             nn.Conv2d(feature_dim * 2, feature_dim, kernel_size=3, stride=1, padding=1),
+            #nn.ReLU(inplace=True),
             nn.Hardswish(inplace=False),
+            #nn.LeakyReLU(inplace=True),
             nn.Conv2d(feature_dim, feature_dim, kernel_size=3, stride=1, padding=1),
+            #nn.ReLU(inplace=True),
+            #nn.LeakyReLU(inplace=True),
         )
                     
     def forward(self, modality1, modality2):

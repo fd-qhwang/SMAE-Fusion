@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from pdb import set_trace as stx
 import math
 import numbers
+# 加上这句话可以解决绝对引用的问题，但是同时导致了相对引用的问题
 import sys,os
 sys.path.append(os.getcwd())
 
@@ -22,11 +23,11 @@ class HATBlock(nn.Module):
     def __init__(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, reduction, kernel_size):
         super(HATBlock, self).__init__()
 
-        self.norm1 = LayerNorm(dim, LayerNorm_type)  
-        self.norm2 = LayerNorm(dim, LayerNorm_type)  
-        self.self_attn = Attention(dim, num_heads, bias) 
-        self.cbam = CBAMBlock(channel=dim, reduction=reduction, kernel_size=kernel_size)  
-        self.ffn = FeedForward(dim, ffn_expansion_factor, bias) 
+        self.norm1 = LayerNorm(dim, LayerNorm_type)
+        self.norm2 = LayerNorm(dim, LayerNorm_type)
+        self.self_attn = Attention(dim, num_heads, bias)
+        self.cbam = CBAMBlock(channel=dim, reduction=reduction, kernel_size=kernel_size)
+        self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
         self.conv1_1 = nn.Conv2d(dim*2, dim, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x):
@@ -34,9 +35,9 @@ class HATBlock(nn.Module):
         attn_out = self.self_attn(norm_x)
         cbam_out = self.cbam(norm_x)
         combined_out = self.conv1_1(torch.cat([cbam_out, attn_out], dim=1))
-        x = x + combined_out  
+        x = x + combined_out
 
-        x = x + self.ffn(self.norm2(x)) 
+        x = x + self.ffn(self.norm2(x))
         return x
 
 #########################################################################
@@ -44,7 +45,7 @@ class HATBlock(nn.Module):
 class PatchEmbed(nn.Module):
     def __init__(self, input_channels=1, output_channels=64, layer_norm='WithBias'):
         super(PatchEmbed, self).__init__()
-        
+
         self.patch_embed = nn.Sequential(
             nn.Conv2d(input_channels, output_channels, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(),
@@ -70,7 +71,8 @@ class Encoder(nn.Module):
         self.final_conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, bias=bias)
 
     def forward(self, x):
-        residual = x  
+        residual = x
+
         for block in self.blocks:
             x = block(x)
 
@@ -88,8 +90,8 @@ class Decoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Conv2d(dim, dim, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),  
-            nn.Conv2d(dim, 1, kernel_size=3, stride=1, padding=1),  
+            nn.LeakyReLU(),
+            nn.Conv2d(dim, 1, kernel_size=3, stride=1, padding=1),
         )
         
         self.tanh = nn.Tanh()

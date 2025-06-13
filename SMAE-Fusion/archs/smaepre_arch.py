@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numbers
+# This line resolves absolute import issues but may cause relative import problems
 import sys,os
 sys.path.append(os.getcwd())
 
@@ -10,8 +11,11 @@ from archs.mae_mask import MaskEmbed, UnMaskEmbed, SAMaskEmbed
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import sys,os
+from torchinfo import summary
+from thop import profile
+from thop import clever_format
 
-#@ARCH_REGISTRY.register()
+@ARCH_REGISTRY.register()
 class SMAEPretrain(nn.Module):
     def __init__(self, 
                  inp_channels=1, 
@@ -55,10 +59,6 @@ class SMAEPretrain(nn.Module):
         vis_enc = self.VIS_embed(modality1)
         ir_enc = self.IR_embed(modality2)
 
-        # Step 2: Add Position Embedding
-        #vis_enc = vis_enc + self.pos_embed_vis  
-        #ir_enc = ir_enc + self.pos_embed_ir   
-
         # Step 3: Apply Masking for MAE Pretraining using SAMaskEmbed
         vis_masked, vis_mask = SAMaskEmbed(vis_enc, map1, mask_ratio=self.mask_ratio)
         ir_masked, ir_mask = SAMaskEmbed(ir_enc, map2, mask_ratio=self.mask_ratio)
@@ -79,5 +79,3 @@ class SMAEPretrain(nn.Module):
         ir_dec = self.IR_Dec(ir_dec)
         
         return vis_dec, ir_dec, vis_mask, ir_mask  # Return the reconstructed VIS/IR images and masks
-
-
