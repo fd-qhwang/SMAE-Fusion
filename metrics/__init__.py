@@ -3,7 +3,6 @@ from copy import deepcopy
 from utils.registry import METRIC_REGISTRY
 #from .psnr_ssim import calculate_psnr, calculate_ssim
 from .fusion import calculate_entropy
-from .seg import calculate_miou
 
 #__all__ = ['calculate_psnr', 'calculate_ssim', 'calculate_niqe']
 __all__ = ['calculate_entropy']
