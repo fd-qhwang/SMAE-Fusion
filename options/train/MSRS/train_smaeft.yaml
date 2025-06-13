@@ -1,0 +1,145 @@
+# General settings
+name: 0613_SMAEFinetune_MSRS_Dim64_Batch4_LR2e-4_crop128_AdamW_Cosine_MSE_M1
+model_type: SMAEFtModel
+num_gpu: 1  # set num_gpu: 0 for CPU mode
+manual_seed: 42
+
+# Dataset and data loader settings
+datasets:
+  train:
+    name: MSRS
+    type: SMAEFtDataset
+    is_train: True
+    stride: 128
+    is_RGB: False
+    dataroot_source1: datasets/MSRS/train/ir
+    dataroot_source2: datasets/MSRS/train/vi
+    mask_path: datasets/MSRS/train/max_mask
+    ir_map_path: datasets/MSRS/train/ir_mask
+    vis_map_path: datasets/MSRS/train/vis_mask
+
+    img_size: 128
+
+    num_worker_per_gpu: 12
+    batch_size_per_gpu: 4
+    dataset_enlarge_ratio: 1
+    pin_memory: true
+    prefetch_mode: cuda
+
+  val_1:
+    name: RoadScene
+    type: SMAEFtDataset
+    is_train: False
+    is_RGB: False
+    dataroot_source1: datasets/test/RoadScene/ir
+    dataroot_source2: datasets/test/RoadScene/vi
+  val_2:
+    name: TNO
+    type: SMAEFtDataset
+    is_train: False
+    is_RGB: False
+    dataroot_source1: datasets/test/TNO/vi
+    dataroot_source2: datasets/test/TNO/ir
+
+# Network structures
+network_g:
+  type: SMAEFinetune
+  inp_channels: 1
+  dim: 64
+  img_size: 128
+  encoder_configs: {
+      'num_blocks': 4,
+      'dim': 64,
+      'num_heads': 8,
+      'ffn_expansion_factor': 4,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+  decoder_configs: {
+      'num_blocks': 2,
+      'dim': 64,
+      'num_heads': 4,
+      'ffn_expansion_factor': 2,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+
+# Training settings
+train:
+  ema_decay: 0  # EMA not used
+  clip_grad: False
+  freeze_encoder: False
+  # Optimizers
+  optim_g:
+    type: AdamW
+    lr: !!float 4e-4
+    weight_decay: !!float 1e-2
+    betas: [0.9, 0.99]
+
+  # Scheduler: Cosine Annealing with Restarts
+  scheduler:
+    type: CosineAnnealingRestartLR
+    periods: [50000, 50000, 50000, 50000]
+    restart_weights: [1, 1, 1, 1]
+    eta_min: !!float 4e-6
+
+  total_iter: 200000
+  warmup_iter: 5000  # Warmup iterations
+  # Loss function for pretraining
+  content_mask_opt:
+    type: MaskLoss
+    loss_weight: !!float 10.0
+    reduction: mean
+  edge_opt:
+    type: SobelLoss2
+    loss_weight: !!float 5.0
+    reduction: mean
+  ssim_opt:
+    type: SSIMLoss2
+    loss_weight: !!float 2.0
+    reduction: mean
+
+
+# Path settings
+path:
+  pretrain_network_g: /checkpoints/net_g_pretrain.pth
+  strict_load_g: true
+  resume_state: ~  # Can resume training if needed
+
+# validation settings
+val:
+  val_freq: !!float 5e3
+  val_start_iter: !!float 0
+  save_img: True
+  pbar: true
+
+
+  metrics:
+    entropy: # metric name, can be arbitrary
+      type: calculate_entropy
+    standard deviation:
+      type: calculate_sd
+    spatial frequency:
+      type: calculate_sf
+    ssim:
+      type: calculate_ssim
+    QABF:
+      type: calculate_qabf
+
+# Logging settings
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: !!float 1e4
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# Distributed training settings
+dist_params:
+  backend: nccl
+  port: 29500

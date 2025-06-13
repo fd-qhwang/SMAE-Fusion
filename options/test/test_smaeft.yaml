@@ -1,0 +1,68 @@
+# General settings
+name: test_SMAEFinetune_MSRS
+model_type: SMAEFtModel
+num_gpu: 1  # set num_gpu: 0 for CPU mode
+manual_seed: 42
+
+# Dataset and data loader settings
+datasets:
+  test_1:
+    name: RoadScene
+    type: SMAEFtDataset
+    is_train: False
+    is_RGB: False
+    dataroot_source1: datasets/test/RoadScene/ir
+    dataroot_source2: datasets/test/RoadScene/vi
+  test_2:
+    name: TNO
+    type: SMAEFtDataset
+    is_train: False
+    is_RGB: False
+    dataroot_source1: datasets/test/TNO/vi
+    dataroot_source2: datasets/test/TNO/ir
+  test_3:
+    name: MSRS
+    type: SMAEFtDataset
+    is_train: False
+    is_RGB: False
+    dataroot_source1: datasets/test/MSRS/ir
+    dataroot_source2: datasets/test/MSRS/vi
+
+# Network structures
+network_g:
+  type: SMAEFinetune
+  inp_channels: 1
+  dim: 64
+  img_size: 128
+  encoder_configs: {
+      'num_blocks': 4,
+      'dim': 64,
+      'num_heads': 8,
+      'ffn_expansion_factor': 4,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+  decoder_configs: {
+      'num_blocks': 2,
+      'dim': 64,
+      'num_heads': 4,
+      'ffn_expansion_factor': 2,
+      'bias': False,
+      'LayerNorm_type': 'WithBias',
+      'reduction': 8,
+      'kernel_size': 3,
+  }
+
+# Path settings
+path:
+  pretrain_network_g: /checkpoints/net_g_fusion.pth
+  strict_load_g: true
+
+# Logging settings
+logger:
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~ 
